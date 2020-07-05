@@ -2,7 +2,7 @@ from mpi4py import MPI
 from score_dofs import *
 
 def score( dofs ):
-    #TODO
+    #USER TODO
     return {"score":0}
 
 def run_worker( comm, rank, out_prefix ):
