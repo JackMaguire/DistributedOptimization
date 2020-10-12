@@ -1,5 +1,4 @@
 from mpi4py import MPI
-from score_dofs import *
 
 def score( dofs ):
     #USER TODO
