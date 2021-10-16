@@ -3,9 +3,6 @@ import nevergrad as ng
 import numpy as np
 import time
 
-all_results_dofs = []
-all_results_scores = []
-
 def send_job_to_node( comm, dofs, node, tag=1 ):
     comm.send( dofs, dest=node, tag=tag )
 
@@ -13,9 +10,6 @@ def interpret_result( bundle ):
     dofs = bundle[ 0 ]
     score = bundle[ 1 ]
     print( "RESULT", score, dofs )
-
-    all_results_dofs.append( np.asarray( dofs.value ) )
-    all_results_scores.append( np.asarray( score ) )
 
 def tell_node_to_die( comm, node ):
     send_job_to_node( comm, "die", node, tag=0 )
@@ -45,7 +39,7 @@ def keep_going( hours_elapsed, hours_limit, njobs_sent, budget ):
         return njobs_sent < budget
         
 #https://stackoverflow.com/questions/21088420/mpi4py-send-recv-with-tag
-def run_master( comm, nprocs, rank, opt, budget, out_prefix, in_prefices, hours ):
+def run_master( comm, nprocs, rank, opt, budget, out_prefix, hours ):
     
     available_nodes = set()
     for i in range( 1, nprocs ):
@@ -56,26 +50,8 @@ def run_master( comm, nprocs, rank, opt, budget, out_prefix, in_prefices, hours 
 
     try:
         #USER TODO
-        Params = ng.p.Array( shape=(3,) )
+        Params = ng.p.Array( shape=(6+4,) ).set_bounds( -2.5, 2.5 )
         optimizer = ng.optimizers.registry[ opt ]( parametrization=Params, budget=budget, num_workers=(nprocs-1) )
-
-        #Load if needed
-        if len( in_prefices ) > 0:
-            npoints_loaded=0
-            for prefix in in_prefices.split( "," ):
-                filenamed = prefix + ".all_results_dofs.npy"
-                filenames = prefix + ".all_results_scores.npy"
-                dofs = np.load( filenamed, allow_pickle=False )
-                score = np.load( filenames, allow_pickle=False )
-                assert( len( dofs ) == len( score ) )
-                for i in range( 0, len( dofs ) ):
-                    #optimizer.suggest( dofs[ i ] )
-                    #x = optimizer.ask()
-                    x = optimizer.parametrization.spawn_child(new_value=dofs[i] )
-                    optimizer.tell( x, score[ i ] )
-                    npoints_loaded += 1
-            print( "loaded", npoints_loaded, "points" )
-
 
         begin = time.time()
         while keep_going( hours_elapsed=float(time.time()-begin)/3600.0, hours_limit=hours, njobs_sent=njobs_sent, budget=budget ):
@@ -114,9 +90,3 @@ def run_master( comm, nprocs, rank, opt, budget, out_prefix, in_prefices, hours 
         print( "Finished after", time.time() - begin, "seconds"  )
         print( "Ran", njobs_sent, "jobs" )
         print( optimizer.provide_recommendation().value )
-
-        test1 = np.asarray( all_results_dofs )
-        print( test1.shape )
-
-        np.save( out_prefix + ".all_results_dofs.npy", np.asarray(all_results_dofs), allow_pickle=False )
-        np.save( out_prefix + ".all_results_scores.npy", np.asarray(all_results_scores), allow_pickle=False )
